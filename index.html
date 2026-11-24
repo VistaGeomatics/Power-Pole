@@ -229,7 +229,7 @@
         <section class="card" id="observations">
           <div class="header-line">
             <div class="observation-intro"><h2>Station observations</h2><p class="muted small">Record S1, the near boundary or shoulder, crossing CL, the far boundary or shoulder, midspan, and S2.</p></div>
-            <label class="field collection-method">Collection method <select id="collectionMethod" data-meta><option value="">Select method</option><option>Disto</option><option>Supa Rule</option><option>Total station</option></select></label>
+            <label class="field collection-method">Collection method <select id="collectionMethod" data-meta><option value="">Select method</option><option value="Disto">Laser Distance Meter (DISTO)</option><option>Supa Rule</option><option>Total station</option></select></label>
             <label class="field collection-method">Readings <select id="measurement-basis" aria-describedby="basis-help"><option value="relative">Height above grade</option><option value="elevation">Survey elevations</option></select></label>
           </div>
           <p id="basis-help" class="help"></p>
@@ -1156,7 +1156,7 @@ function legend(lines) {
   return [{label:'Existing grade',color:'#2b7964'},...lines].map(line => `<span style="--series:${line.color}">${esc(line.label)}</span>`).join('');
 }
 function metrics(state) {
-  return `<div class="metric"><strong>${state.length === null ? '—' : `${fmt(state.length)} m`}</strong><span>Total distance</span></div><div class="metric"><strong>${state.min === null ? '—' : `${fmt(state.min)} m`}</strong><span>Smallest recorded gap</span></div>`;
+  return `<div class="metric"><strong>${state.length === null ? '-' : `${fmt(state.length)} m`}</strong><span>Total distance</span></div><div class="metric"><strong>${state.min === null ? '-' : `${fmt(state.min)} m`}</strong><span>Lowest recorded clearance</span></div>`;
 }
 function refresh() {
   const state = stateOfForm();
@@ -1446,13 +1446,15 @@ function printReport() {
   const needsReview = review.warnings.length;
   const gradeNote = job.rows.some(gradeAssumed) ? '* Grade offset assumed 0.00 m. ' : '';
   const wireSketches = printWireSketches();
-  report.innerHTML = `<div class="print-head"><div>${logoMarkup()}<h1>Powerline Crossing Profile</h1></div><div class="status ${review.incomplete.length || needsReview ? 'pending' : 'ready'}">${review.incomplete.length ? 'Incomplete field draft' : needsReview ? 'Field data complete · Review warnings' : 'Field data complete · ALS review'}</div></div>
+  const method = meta.collectionMethod && Array.from($('collectionMethod').options).find(option => option.value === meta.collectionMethod)?.label;
+  const status = review.incomplete.length ? 'Incomplete field draft' : needsReview ? 'Review warnings' : '';
+  report.innerHTML = `<div class="print-head"><div>${logoMarkup()}<h1>Powerline Crossing Profile</h1></div>${status ? `<div class="status pending">${status}</div>` : ''}</div>
     <div class="field-grid">${fields.map(([name,value]) => `<div><span>${esc(name)}</span>${esc(value || '—')}</div>`).join('')}</div>
     <div class="plot"><div class="metrics">${metrics(state)}</div><div class="print-profile${wireSketches ? '' : ' solo'}"><div><div class="profile-chart">${chart(state.lines)}</div><div class="legend">${legend(state.lines)}</div></div>${wireSketches}</div></div>
-    <div class="header-line"><h2>Station observations</h2><div class="method-report">Collection method · ${esc(meta.collectionMethod || 'Pending')}</div></div>${printObservationTables(state.lines)}
-    ${printPipelineCheck(state.proximity)}
+    <div class="header-line"><h2>Station observations</h2><div class="method-report">Collection method · ${esc(method || 'Pending')}</div></div>${printObservationTables(state.lines)}
+    <div class="report-flags">${printPipelineCheck(state.proximity)}
+    ${state.warnings.length ? `<h2>Profile warnings</h2><ul class="pipeline-distances pipeline-alert">${state.warnings.map(item => `<li>${esc(item.text)}</li>`).join('')}</ul>` : ''}</div>
     ${meta.wireNotes ? `<h2>Configuration notes</h2><div class="lines">${esc(meta.wireNotes)}</div>` : ''}${meta.notes ? `<h2>Survey notes</h2><div class="lines">${esc(meta.notes)}</div>` : ''}
-    ${state.warnings.length ? `<h2>Profile warnings</h2><ul class="pipeline-distances pipeline-alert">${state.warnings.map(item => `<li>${esc(item.text)}</li>`).join('')}</ul>` : ''}
     ${review.incomplete.length ? `<h2>Items to follow up</h2><ul class="print-check">${review.incomplete.map(issue => `<li>${esc(issue.text)}</li>`).join('')}</ul>` : ''}<p class="small muted">${gradeNote}Survey draft for ALS review.</p>${printPhotos()}`;
 }
 function reviewItems(state) {
@@ -1476,7 +1478,9 @@ async function createReportPDF(report) {
   const charset = new Set(regular.getCharacterSet());
   const width = 612, height = 792, margin = 32;
   const body = width - 2*margin;
-  const bottom = 748;
+  const pageLimit = 2;
+  const contentBottom = 730;
+  const photoReserve = 309;
   const ink = colour('#172b37'), teal = colour('#126e76'), muted = colour('#4a626f');
   const border = colour('#ccdce0'), pale = colour('#eff6f7'), alert = colour('#893b21');
   const white = rgb(1,1,1);
@@ -1484,10 +1488,12 @@ async function createReportPDF(report) {
   const fields = [...report.querySelector('.field-grid').children];
   const jobRef = fields[1].lastChild.textContent.trim();
   const status = report.querySelector('.print-head .status');
+  const appendix = report.querySelector('.photo-appendix');
   pdf.setTitle(title);
   pdf.setAuthor('Vista Geomatics');
   pdf.setSubject(jobRef !== '-' ? `Job ${jobRef}` : 'Survey draft for ALS review');
-  let page, top;
+  let page, top, overflow = false;
+  let drawingPhotos = false;
 
   function colour(hex) {
     return rgb(...hex.match(/[0-9a-f]{2}/gi).map(channel => parseInt(channel,16)/255));
@@ -1537,27 +1543,35 @@ async function createReportPDF(report) {
   function newPage(heading = title) {
     page = pdf.addPage([width,height]);
     image(logo,margin,30,103,38);
-    text(heading,margin+121,30,18,bold);
-    const caption = heading === title ? status.textContent : (jobRef === '-' ? '' : `Job ${jobRef}`);
-    text(caption,margin+121,53,9,bold,heading === title && status.classList.contains('pending') ? alert : teal);
-    rect(margin,75,body,1.6,teal);
-    top = 86;
+    const caption = heading === title ? status?.textContent : (jobRef === '-' ? '' : `Job ${jobRef}`);
+    text(heading,margin+121,caption ? 30 : 37,18,bold);
+    if (caption) text(caption,margin+121,53,9,bold,heading === title ? alert : teal);
+    rect(margin,70,body,1.6,teal);
+    top = 80;
   }
   function ensure(space) {
-    if (top+space > bottom) newPage();
+    const limit = pdf.getPageCount() === pageLimit && appendix && !drawingPhotos ? contentBottom-photoReserve : contentBottom;
+    if (top+space <= limit) return true;
+    if (pdf.getPageCount() < pageLimit) {
+      newPage();
+      return ensure(space);
+    }
+    overflow = true;
+    return false;
   }
   function heading(value,color = teal) {
-    ensure(32);
+    if (!ensure(27)) return false;
     text(value,margin,top,12,bold,color);
-    top += 18;
+    top += 16;
+    return true;
   }
   function paragraph(value,color = ink,indent = 0) {
-    for (const line of wrap(value,body-indent,9)) {
-      ensure(12);
-      text(line,margin+indent,top,9,regular,color);
-      top += 12;
+    for (const line of wrap(value,body-indent,8.7)) {
+      if (!ensure(11)) return;
+      text(line,margin+indent,top,8.7,regular,color);
+      top += 11;
     }
-    top += 4;
+    top += 3;
   }
   function section(node) {
     const color = node.classList.contains('pipeline-alert') ? alert : ink;
@@ -1565,13 +1579,13 @@ async function createReportPDF(report) {
     else if (node.matches('ul')) {
       for (const item of node.children) paragraph(`•  ${item.textContent}`,item.classList.contains('pipeline-alert') ? alert : color,7);
     } else if (node.matches('table')) drawTable(node);
-    else if (node.matches('.pipeline-report')) for (const item of node.children) section(item);
+    else if (node.matches('.pipeline-report,.report-flags')) for (const item of node.children) section(item);
     else if (node.querySelector('a')) {
       const link = node.querySelector('a');
-      ensure(16);
+      if (!ensure(15)) return;
       const linkTop = top;
       paragraph(link.textContent,teal);
-      const right = margin + regular.widthOfTextAtSize(link.textContent,9);
+      const right = margin + regular.widthOfTextAtSize(link.textContent,8.7);
       const annotation = pdf.context.obj({Type:'Annot',Subtype:'Link',
         Rect:[margin,height-linkTop-12,right,height-linkTop],Border:[0,0,0],
         A:{Type:'Action',S:'URI',URI:PDFString.of(link.href)}});
@@ -1585,7 +1599,8 @@ async function createReportPDF(report) {
     const weights = [70,106,52,54,...Array(readings).fill(readings === 1 ? 84 : 46),...(hasNotes ? [43,100] : [])];
     const sum = weights.reduce((total,value) => total+value,0);
     const widths = weights.map(value => value*body/sum);
-    const size = 8.2, lineHeight = 10.2;
+    const size = 8.2, lineHeight = 9.6;
+    const rowHeight = cells => Math.max(...cells.map(cell => cell.lines.length))*lineHeight+5;
     function cellsOf(cells,isHeader) {
       return [...cells].map((cell,index) => {
         const font = isHeader || index === 0 ? bold : regular;
@@ -1596,30 +1611,31 @@ async function createReportPDF(report) {
       });
     }
     function drawRow(cells,isHeader,rowIndex = 0) {
-      const rowHeight = Math.max(...cells.map(cell => cell.lines.length))*lineHeight+8;
+      const height = rowHeight(cells);
       let x = margin;
       cells.forEach(({font,right,lines},index) => {
         const colWidth = widths[index];
-        rect(x,top,colWidth,rowHeight,isHeader ? pale : rowIndex%2 ? colour('#f8fbfc') : white,border);
-        lines.forEach((line,i) => text(line,right ? x+colWidth-5-font.widthOfTextAtSize(line,size) : x+5,top+4+i*lineHeight,size,font));
+        rect(x,top,colWidth,height,isHeader ? pale : rowIndex%2 ? colour('#f8fbfc') : white,border);
+        lines.forEach((line,i) => text(line,right ? x+colWidth-5-font.widthOfTextAtSize(line,size) : x+5,top+2.5+i*lineHeight,size,font));
         x += colWidth;
       });
-      top += rowHeight;
+      top += height;
     }
     const header = cellsOf(headers,true);
-    ensure(52);
+    const rows = [...table.tBodies[0].rows].map(row => cellsOf(row.cells,false));
+    if (!ensure(rowHeight(header)+(rows.length ? rowHeight(rows[0]) : 0))) return;
     drawRow(header,true);
-    [...table.tBodies[0].rows].forEach((row,index) => {
-      const cells = cellsOf(row.cells,false);
-      const rowHeight = Math.max(...cells.map(cell => cell.lines.length))*lineHeight+8;
-      if (top+rowHeight > bottom) {
-        newPage();
+    for (const [index,cells] of rows.entries()) {
+      const previous = page;
+      if (!ensure(rowHeight(cells))) break;
+      if (page !== previous) {
+        if (!ensure(16+rowHeight(header)+rowHeight(cells))) break;
         heading('Station observations continued');
         drawRow(header,true);
       }
       drawRow(cells,false,index);
-    });
-    top += 12;
+    }
+    top += 8;
   }
 
   const logoImage = report.querySelector('.vista-mark img');
@@ -1645,8 +1661,8 @@ async function createReportPDF(report) {
       label:wrap(field.firstElementChild.textContent,fieldWidth-11,7.7,bold),
       value:wrap(field.lastChild.textContent,fieldWidth-11,9)
     }));
-    const rowHeight = Math.max(...cells.map(cell => cell.label.length*9+cell.value.length*11))+8;
-    ensure(rowHeight);
+    const rowHeight = Math.max(...cells.map(cell => cell.label.length*9+cell.value.length*11))+5;
+    if (!ensure(rowHeight)) break;
     cells.forEach((cell,col) => {
       const x = margin+col*fieldWidth;
       cell.label.forEach((line,j) => text(line,x,top+j*9,7.7,bold,muted));
@@ -1657,78 +1673,102 @@ async function createReportPDF(report) {
   const svg = report.querySelector('.profile-chart svg');
   const sketches = [...report.querySelectorAll('.print-pole-sketch')];
   const chartSize = sketches.length ? body-128 : body;
-  const chartHeight = Math.min(214,chartSize*307/636);
+  const chartHeight = Math.min(178,chartSize*307/636);
   const cards = [...report.querySelectorAll('.metric')];
-  ensure(svg ? chartHeight+100 : 90);
-  cards.forEach((card,index) => {
-    const cell = (body-8)/2, x = margin+index*(cell+8);
-    rect(x,top,cell,30,pale,border);
-    text(card.querySelector('strong').textContent,x+9,top+4,11,bold,teal);
-    text(card.querySelector('span').textContent,x+9,top+17,8,regular,muted);
-  });
-  top += 40;
-  heading('Crossing profile');
-  if (svg) {
-    const chart = await pdf.embedPng(await reportSvgPNG(svg,636,307));
-    image(chart,margin,top,chartSize,chartHeight);
-    for (const [index,sketch] of sketches.entries()) {
-      const x = margin+chartSize+8, y = top+index*86;
-      if (index === 0) text('Wire configuration',x,y,9,bold,teal);
-      text(sketch.firstElementChild.textContent,x,y+13,8,bold,muted);
-      const drawing = await pdf.embedPng(await reportWirePNG(sketch));
-      image(drawing,x,y+22,120,62);
-    }
-    top += chartHeight+3;
-    let x = margin;
-    for (const item of report.querySelectorAll('.legend span')) {
-      const label = item.textContent, space = regular.widthOfTextAtSize(safeText(label),8)+23;
-      if (x+space > width-margin) {x = margin;top += 12;ensure(12);}
-      rect(x,top+4,10,2,colour(item.style.getPropertyValue('--series').trim()));
-      text(label,x+14,top,8);
-      x += space;
-    }
-    top += 23;
-  } else paragraph(report.querySelector('.profile-chart').textContent);
+  if (ensure(svg ? chartHeight+99 : 90)) {
+    cards.forEach((card,index) => {
+      const cell = (body-8)/2, x = margin+index*(cell+8);
+      rect(x,top,cell,30,pale,border);
+      text(card.querySelector('strong').textContent,x+9,top+4,11,bold,teal);
+      text(card.querySelector('span').textContent,x+9,top+17,8,regular,muted);
+    });
+    top += 36;
+    heading('Crossing profile');
+    if (svg) {
+      const chart = await pdf.embedPng(await reportSvgPNG(svg,636,307));
+      image(chart,margin,top,chartSize,chartHeight);
+      for (const [index,sketch] of sketches.entries()) {
+        const x = margin+chartSize+8, y = top+index*86;
+        if (index === 0) text('Wire configuration',x,y,9,bold,teal);
+        text(sketch.firstElementChild.textContent,x,y+13,8,bold,muted);
+        const drawing = await pdf.embedPng(await reportWirePNG(sketch));
+        image(drawing,x,y+22,120,62);
+      }
+      top += chartHeight+3;
+      let x = margin;
+      for (const item of report.querySelectorAll('.legend span')) {
+        const label = item.textContent, space = regular.widthOfTextAtSize(safeText(label),8)+23;
+        if (x+space > width-margin) {x = margin;top += 12;}
+        rect(x,top+4,10,2,colour(item.style.getPropertyValue('--series').trim()));
+        text(label,x+14,top,8);
+        x += space;
+      }
+      top += 17;
+    } else paragraph(report.querySelector('.profile-chart').textContent);
+  }
 
+  const flags = report.querySelector('.report-flags');
+  section(flags);
   const observations = report.querySelector('.header-line');
-  ensure(95);
-  heading(observations.querySelector('h2').textContent);
-  paragraph(observations.querySelector('.method-report').textContent,muted);
-  for (let node = observations.nextElementSibling; node && !node.matches('.photo-appendix'); node = node.nextElementSibling) section(node);
+  if (ensure(70)) {
+    heading(observations.querySelector('h2').textContent);
+    paragraph(observations.querySelector('.method-report').textContent,muted);
+  }
+  for (let node = observations.nextElementSibling; node && node !== appendix; node = node.nextElementSibling) {
+    if (node !== flags) section(node);
+  }
 
-  const appendix = report.querySelector('.photo-appendix');
   if (appendix) {
-    newPage(appendix.querySelector('h1').textContent);
-    const location = appendix.querySelector('p').textContent;
-    if (location) paragraph(location,muted);
+    drawingPhotos = true;
+    const photoTitle = appendix.querySelector('h1').textContent;
+    if (pdf.getPageCount() < pageLimit) newPage(photoTitle);
+    else heading(photoTitle);
     const hasTags = appendix.classList.contains('has-tags');
-    const boxWidth = (body-12)/2, imageHeight = hasTags ? 280 : 385;
+    const boxWidth = (body-12)/2;
     const figures = [...appendix.querySelectorAll('figure')];
+    const notes = figures.map(figure => {
+      const value = figure.querySelector('.lines')?.textContent;
+      return value ? wrap(value,boxWidth,8.4) : [];
+    });
+    const available = contentBottom-top;
+    const notesHeight = notes.some(lines => lines.length) ? Math.min(75,14+Math.max(...notes.map(lines => lines.length))*10.5) : 0;
+    const tagHeight = hasTags ? Math.min(112,Math.floor(available*.22)) : 0;
+    const overhead = 41+(hasTags ? tagHeight+23 : 0);
+    const imageHeight = Math.min(hasTags ? 280 : 385,available-overhead-notesHeight);
     for (const [index,figure] of figures.entries()) {
       const x = margin+index*(boxWidth+12);
       text(figure.querySelector('figcaption').textContent,x,top,11,bold,teal);
-      text(figure.querySelector('p').textContent,x,top+17,9,regular,muted);
-      rect(x,top+34,boxWidth,imageHeight,pale,border);
+      text(figure.querySelector('p').textContent,x,top+16,9,regular,muted);
       const overview = figure.querySelector('.pole-main');
-      if (overview) image(await pdf.embedJpg(overview.src),x+4,top+38,boxWidth-8,imageHeight-8);
+      if (overview) {
+        rect(x,top+30,boxWidth,imageHeight,pale,border);
+        image(await pdf.embedJpg(overview.src),x+4,top+34,boxWidth-8,imageHeight-8);
+      }
       const tag = figure.querySelector('.pole-tag-image');
       if (tag) {
-        const y = top+imageHeight+46;
-        text('Stamp or tag',x,y,9,bold);
-        rect(x,y+15,boxWidth,118,pale,border);
-        image(await pdf.embedJpg(tag.src),x+4,y+19,boxWidth-8,110);
+        const y = top+imageHeight+36;
+        text('Stamp or tag',x,y,8.5,bold);
+        rect(x,y+14,boxWidth,tagHeight,pale,border);
+        image(await pdf.embedJpg(tag.src),x+4,y+18,boxWidth-8,tagHeight-8);
       }
-    }
-    top += imageHeight+(hasTags ? 192 : 49);
-    for (const figure of figures) {
-      const note = figure.querySelector('.lines')?.textContent;
-      if (note) {
-        heading(figure.querySelector('figcaption').textContent+' notes');
-        paragraph(note);
+      if (notes[index].length) {
+        const y = top+imageHeight+overhead;
+        const lines = notes[index].slice(0,Math.floor((notesHeight-14)/10.5));
+        text('Pole notes',x,y,8.5,bold,teal);
+        lines.forEach((line,i) => text(line,x,y+13+i*10.5,8.4));
+        if (lines.length < notes[index].length) overflow = true;
       }
     }
   }
   const pages = pdf.getPages();
+  if (overflow) {
+    page = pages.at(-1);
+    text('Additional field details are in the attached Full Field Record.',margin,740,8.5,bold,alert);
+    await pdf.attach(new TextEncoder().encode(fieldRecordText(report)),'Powerline Crossing - Full Field Record.txt',{
+      mimeType:'text/plain',
+      description:'Complete field observations, readings, warnings and notes'
+    });
+  }
   for (const [index,current] of pages.entries()) {
     page = current;
     rect(margin,759,body,.6,border);
@@ -1736,7 +1776,23 @@ async function createReportPDF(report) {
     const number = `${index+1} / ${pages.length}`;
     text(number,width-margin-regular.widthOfTextAtSize(number,8),768,8,regular,muted);
   }
-  return pdf.save();
+  return {bytes:await pdf.save(),overflow};
+}
+
+function fieldRecordText(report) {
+  const sections = [...report.children];
+  return sections.flatMap(section => {
+    if (section.matches('.field-grid')) return [...section.children].map(field =>
+      `${field.firstElementChild.textContent}: ${field.lastChild.textContent}`);
+    if (section.matches('table')) return [...section.rows].map(row =>
+      [...row.cells].map(cell => cell.textContent.trim()).join('\t'));
+    if (section.matches('.plot')) return [...section.querySelectorAll('.metric')].map(card =>
+      `${card.querySelector('span').textContent}: ${card.querySelector('strong').textContent}`);
+    if (section.matches('.photo-appendix,.print-head,.header-line,.report-flags,ul')) {
+      return [...section.querySelectorAll('h1,h2,h3,figcaption,p,li,.status,.method-report')].map(item => item.textContent);
+    }
+    return [section.textContent];
+  }).filter(line => line.trim()).join('\r\n');
 }
 
 async function reportSvgPNG(source,width,height) {
@@ -1786,14 +1842,14 @@ async function exportPDF() {
   const name = `Powerline Crossing - ${jobNumber || 'No Job Number'} - ${job.meta.date || 'No Survey Date'}.pdf`;
   try {
     printReport();
-    const bytes = await createReportPDF($('print-report').cloneNode(true));
+    const {bytes,overflow} = await createReportPDF($('print-report').cloneNode(true));
     if (lastPdfURL) URL.revokeObjectURL(lastPdfURL);
     lastPdfURL = URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
     const link = $('pdf-download');
     link.href = lastPdfURL;
     link.download = name;
     link.hidden = false;
-    $('pdf-status').textContent = 'PDF ready.';
+    $('pdf-status').textContent = overflow ? 'PDF ready. Full field record attached.' : 'PDF ready.';
     link.click();
   } catch (error) {
     console.error(error);
