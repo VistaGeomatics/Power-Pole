@@ -1782,7 +1782,8 @@ async function exportPDF() {
   $('pdf-result').hidden = false;
   $('pdf-status').textContent = 'Preparing your PDF.';
   $('pdf-download').hidden = true;
-  const name = filename('pdf');
+  const jobNumber = (job.meta.fileNumber ?? '').replace(/[\x00-\x1f<>:"/\\|?*]/g,'-').trim();
+  const name = `Powerline Crossing - ${jobNumber || 'No Job Number'} - ${job.meta.date || 'No Survey Date'}.pdf`;
   try {
     printReport();
     const bytes = await createReportPDF($('print-report').cloneNode(true));
