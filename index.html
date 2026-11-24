@@ -90,6 +90,24 @@
   .save-review-actions{position:sticky;bottom:0;padding:11px 18px;background:#f6fafb;border-top:1px solid var(--line);justify-content:flex-end}
   .sketch{aspect-ratio:1.8}
   .wire-support{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  #job{container:job-details / inline-size}
+  #job .grid>*{min-inline-size:0}
+  #job input,#job select{display:block;min-inline-size:0;max-inline-size:100%;box-sizing:border-box}
+  #job input:is([type=date],[type=time]){-webkit-appearance:none;appearance:none}
+  #job input::-webkit-date-and-time-value{min-width:0;text-align:left}
+  #job input::-webkit-datetime-edit{padding:0}
+  @container job-details (max-width:720px){#job .grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @container job-details (max-width:425px){#job .grid{grid-template-columns:minmax(0,1fr)}#job .wide{grid-column:auto}}
+  .sketch-toggle{display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;font-size:.83rem;font-weight:650}
+  .sketch-toggle input{width:19px;min-height:19px;height:19px;margin:0;flex:none;accent-color:var(--teal)}
+  .sketch-poles{display:flex;gap:6px;margin:8px 0}
+  .sketch-poles button[aria-pressed=true]{background:#e2f3f2;border-color:var(--teal);color:#0a615f}
+  .pole-distances{margin-top:5px;color:var(--muted);font-size:.75rem}
+  .pole-distances summary{cursor:pointer;color:#195260;font-weight:650}
+  .pole-distances .distance-fields{display:grid;gap:5px;margin:5px 0}
+  .pole-distances input{min-height:34px}
+  .pipe-reference{display:inline-block;margin-top:3px;font-size:.81rem}
+  #print-report .print-pole-sketch{margin-top:2mm}
   #observations{container-type:inline-size;container-name:observations}
   #observation-scroll{overflow:visible}
   .obs-table{table-layout:fixed;min-width:0}
@@ -129,7 +147,7 @@
   #print-report{font-size:9pt;line-height:1.28}
   #pole-reference,#enlarged-sketch,#save-review{display:none!important}
   #print-report h1{font-size:18pt}
-  #print-report h2{margin:3mm 0 1.5mm}
+  #print-report h2{margin:3mm 0 1.5mm;break-after:avoid}
   #print-report .field-grid{gap:1mm 4mm;margin:2.5mm 0}
   #print-report .metric{padding:1mm 2mm}
   #print-report .metric strong{font-size:11pt}
@@ -176,14 +194,15 @@
             <label class="field">Land agent / Client file number <input id="agentFile" data-meta placeholder="If applicable" maxlength="60"></label>
             <label class="field">Crossing type <select id="crossing" data-meta><option value="">Select</option><option>Pipeline</option><option>Access road</option><option>Pipeline and access road</option><option>Other</option></select></label>
             <label class="field" id="crossing-other" hidden>Other crossing type <input id="crossingOther" data-meta maxlength="100"></label>
-            <label class="field">Proposed grade change at crossing CL <select id="gradeChange" data-meta><option value="">Select</option><option value="na" selected>None</option><option value="known">Yes, details available</option><option value="pending">Pending confirmation</option></select></label>
+            <label class="field">Proposed grade change at crossing CL <select id="gradeChange" data-meta><option value="na" selected>None</option><option value="known">Yes, details available</option><option value="pending">Pending confirmation</option></select></label>
             <label class="field wide" id="grade-detail" hidden>Proposed grade details at CL <input id="gradeDetail" data-meta placeholder="Grade change, design elevation or drawing reference" maxlength="220"><small id="grade-crossing-help" hidden>Identify the pipeline or road centreline the change applies to.</small></label>
             <label class="field">Survey date <input id="date" data-meta type="date"></label>
             <label class="field">Survey time <input id="time" data-meta type="time"></label>
             <label class="field">Ambient temperature (°C) <input id="temperature" data-meta inputmode="decimal" placeholder="e.g. 11" maxlength="12"></label>
-            <label class="field">Weather conditions <input id="weather" data-meta placeholder="e.g. Overcast" maxlength="100"></label>
+            <label class="field">Weather conditions <select id="weather" data-meta><option value="">Select weather</option><option>Clear / sunny</option><option>Partly cloudy</option><option>Overcast</option><option>Rain</option><option>Snow</option><option>Freezing rain</option><option>Fog</option><option>Windy</option><option>Other</option></select></label>
+            <label class="field" id="weather-other" hidden>Other weather conditions <input id="weatherOther" data-meta maxlength="100"></label>
             <label class="field">S1 end direction <select id="direction1" data-meta class="direction"></select></label>
-            <label class="field">S2 end direction <select id="direction2" data-meta class="direction"></select></label>
+            <label class="field">S2 end direction <input id="direction2" data-meta readonly placeholder="Set by S1"></label>
           </div>
         </section>
         <section class="card" id="configuration">
@@ -192,12 +211,14 @@
             <div class="grid">
               <label class="field">Phase <select id="phase"><option value="">Select phase</option><option value="single">Single-phase</option><option value="three">Three-phase</option></select></label>
               <label class="field">Wires at crossing <select id="wireCount"></select></label>
-              <label class="field wide">Conductor readings <select id="mode"><option value="one">One recorded conductor per station</option><option value="all">Separate readings by wire</option></select></label>
+              <label class="field wide">Conductor readings <select id="mode"><option value="one">Lowest conductor</option><option value="all">Separate readings by wire</option></select></label>
               <div class="field wide" id="measured-wires" hidden><span id="wire-selection-label">Wires to measure</span><div id="wire-selection" class="actions" role="group" aria-labelledby="wire-selection-label"></div><small>Select the wires the job calls for.</small></div>
               <label class="field wide">Configuration notes <textarea id="wireNotes" data-meta placeholder="Wire identification, measurement basis or field notes" maxlength="700"></textarea></label>
             </div>
             <figure class="sketch-box" id="sketch-box" hidden>
               <figcaption class="small"><strong>Wire configuration</strong></figcaption>
+              <label class="sketch-toggle"><input type="checkbox" id="s2-differs"> S2 differs from S1</label>
+              <div class="sketch-poles" id="sketch-poles" role="group" aria-label="Pole to sketch" hidden><button type="button" id="sketch-s1" data-sketch-pole="S1">Edit S1</button><button type="button" id="sketch-s2" data-sketch-pole="S2">Edit S2</button></div>
               <p class="help">Select a wire, then tap its position on the sketch.</p>
               <div id="wire-controls" class="wire-controls"></div>
               <div id="sketch" class="sketch" tabindex="0" role="button" aria-label="Place selected wire. Use arrow keys to position a wire or Enter to place it."></div>
@@ -214,7 +235,7 @@
           <p id="basis-help" class="help"></p>
           <p id="pencil-help" class="help" hidden><strong>Apple Pencil</strong> Write directly in a text or number field with Scribble enabled in Settings › Apple Pencil.</p>
           <p id="supa-warning" class="method-warning" role="status" hidden><strong>Supa Rule</strong> Take multiple shots at each conductor observation and compare the readings before recording the result.</p>
-          <div class="method-warning" id="pipeline-check" hidden role="status" tabindex="-1"><ul class="pipeline-distances" id="pipe-readings"></ul></div>
+          <div class="method-warning" id="pipeline-check" hidden role="status" tabindex="-1"><strong>Pipeline warning</strong><ul class="pipeline-distances" id="pipe-readings"></ul><a class="pipe-reference" href="https://ebs.safetycodes.ab.ca/documents/webdocs/PI/2022_AEUC.pdf#page=14" target="_blank" rel="noopener">Alberta Electrical Utility Code, Rule 2-030</a> <span class="small">· Rural underground pipeline separation</span></div>
           <div class="table-actions"><button type="button" id="add-required" class="primary" hidden>Add missing required stations</button><button type="button" id="add-pipeline">Add pipeline</button><button type="button" id="add-road">Add access road</button><button type="button" id="add">Add station</button></div>
           <p id="insertion-point" class="small station-action-help" aria-live="polite"></p>
           <div id="observation-scroll" class="table-wrap"><table class="obs-table" id="observation-table" aria-label="Station observations"></table></div>
@@ -292,10 +313,15 @@ const requiredSequence = ['boundary','centreline','boundary','midspan'];
 const separationThreshold = 8;
 const photoLimit = 560000;
 const pendingPhotos = new Map();
-const required = {location:'Location',fileNumber:'Job Number',completedBy:'Completed by',client:'Client',crossing:'Crossing type',gradeChange:'Proposed grade change at crossing CL',date:'Survey date',time:'Survey time',temperature:'Ambient temperature',weather:'Weather conditions',direction1:'S1 end direction',direction2:'S2 end direction',collectionMethod:'Collection method'};
+const required = {location:'Location',fileNumber:'Job Number',completedBy:'Completed by',client:'Client',crossing:'Crossing type',gradeChange:'Proposed grade change at crossing CL',date:'Survey date',time:'Survey time',temperature:'Ambient temperature',weather:'Weather conditions',direction1:'S1 end direction',collectionMethod:'Collection method'};
 const measurementLabels = {relative:'Height above grade',elevation:'Survey elevations'};
+const clearanceLimits = {single:{road:5.7,pipeline:4.5},three:{road:6,pipeline:4.8}};
 const metaKeys = [...document.querySelectorAll('[data-meta]')].map(input => input.id);
 const directions = ['North','Northeast','East','Southeast','South','Southwest','West','Northwest'];
+function oppositeDirection(value) {
+  const index = directions.indexOf(value);
+  return index < 0 ? '' : directions[(index+4)%8];
+}
 const poleEquipment = [
   {name:'Primary conductors',detail:'Carry the distribution supply.',point:[341,76],marker:[391,48]},
   {name:'Insulator',detail:'Supports a conductor and isolates it from its mounting.',point:[112,99],marker:[49,70]},
@@ -312,6 +338,7 @@ const poleEquipment = [
 const palette = ['#176c9a','#9d5027','#785491','#706222','#a63b65','#216584','#784834','#4353a2','#536519','#81586d','#277366','#874739'];
 let serial = 0;
 let activeWire = 1;
+let activeSketchPole = 'S1';
 let selectedStation = '';
 let storageOK = true;
 let saveTimer;
@@ -346,7 +373,7 @@ function inferCentreline(description) {
   return pipeline === road ? '' : pipeline ? 'pipeline' : 'road';
 }
 function row(role, description = '', chainage = '', kind = inferKind(description)) {
-  return {id:`row-${++serial}`,role,kind:role === 'Y' ? kind : 'structure',centrelineOf:kind === 'centreline' ? inferCentreline(description) : '',feature:'',edge:'',description,chainage,grade:'',conductor:'',wires:{},notes:''};
+  return {id:`row-${++serial}`,role,kind:role === 'Y' ? kind : 'structure',centrelineOf:kind === 'centreline' ? inferCentreline(description) : '',feature:'',edge:'',description,chainage,grade:'',conductor:'',wires:{},notes:'',pipeS1:'',pipeS2:''};
 }
 function restoreFeature(station,feature,edge) {
   if (station.role !== 'Y' || typeof feature !== 'string' || !/^[PR][1-9]\d{0,3}$/.test(feature)) return;
@@ -361,7 +388,7 @@ function emptyPoles() {
 }
 function blankJob() {
   const rows = [row('S1','Structure 1','0.00'),...requiredSequence.map((kind,index) => row('Y',stationDefault(kind,undefined,index === 0 ? 'Near' : 'Far'),'',kind)),row('S2','Structure 2')];
-  return {version:1,meta:{gradeChange:'na'},measurementBasis:'relative',phase:'',count:1,mode:'one',customRead:false,wiresToRead:[],positions:{},poles:emptyPoles(),rows};
+  return {version:1,meta:{gradeChange:'na'},measurementBasis:'relative',phase:'',count:1,mode:'one',customRead:false,wiresToRead:[],positions:{},positionsS2:{},wireConfigDiffers:false,poles:emptyPoles(),rows};
 }
 function reportNumber(raw) {
   const value = String(raw ?? '').trim().replace(/[−–]/g, '-').replace(',', '.');
@@ -374,9 +401,17 @@ function readText(value, length = 240) { return typeof value === 'string' ? valu
 function validPhoto(value) {
   return typeof value === 'string' && value.length <= photoLimit && /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(value);
 }
+function validSketch(raw) {
+  const result = {};
+  for (let wire=1; wire<=savedWireLimit; wire++) {
+    const point = raw?.[wire];
+    if (point && Number.isFinite(point.x) && Number.isFinite(point.y) && point.x >= 8 && point.x <= 92 && point.y >= 14 && point.y <= 86) result[wire] = {x:point.x,y:point.y};
+  }
+  return result;
+}
 function normaliseJob(raw) {
   if (!raw || raw.version !== 1 || !Array.isArray(raw.rows) || raw.rows.length < 3 || raw.rows.length > 200 || raw.rows[0]?.role !== 'S1' || raw.rows.at(-1)?.role !== 'S2' || !raw.rows.slice(1,-1).every(item => item?.role === 'Y')) throw Error('This job file must contain S1, at least one observation station and S2.');
-  const result = {version:1,meta:{},measurementBasis:raw.measurementBasis === 'relative' ? 'relative' : 'elevation',phase:['single','three'].includes(raw.phase) ? raw.phase : '',count:1,mode:raw.mode === 'all' ? 'all' : 'one',customRead:raw.customRead === true,wiresToRead:[],positions:{},poles:emptyPoles(),rows:[]};
+  const result = {version:1,meta:{},measurementBasis:raw.measurementBasis === 'relative' ? 'relative' : 'elevation',phase:['single','three'].includes(raw.phase) ? raw.phase : '',count:1,mode:raw.mode === 'all' ? 'all' : 'one',customRead:raw.customRead === true,wiresToRead:[],positions:validSketch(raw.positions),positionsS2:validSketch(raw.positionsS2),wireConfigDiffers:raw.wireConfigDiffers === true,poles:emptyPoles(),rows:[]};
   for (const key of ['pipeS1','pipeS2']) if (typeof raw.meta?.[key] === 'string') result.meta[key] = raw.meta[key];
   result.count = Number.isInteger(raw.count) && raw.count >= 1 && raw.count <= savedWireLimit ? raw.count : result.phase === 'three' ? 3 : 1;
   for (const field of metaKeys) {
@@ -387,10 +422,13 @@ function normaliseJob(raw) {
       const probe = document.createElement('input');probe.type=input.type;probe.value=value;result.meta[field]=probe.value;
     } else result.meta[field] = value;
   }
-  for (let wire=1; wire<=savedWireLimit; wire++) {
-    const point = raw.positions?.[wire];
-    if (point && Number.isFinite(point.x) && Number.isFinite(point.y) && point.x >= 8 && point.x <= 92 && point.y >= 14 && point.y <= 86) result.positions[wire] = {x:point.x,y:point.y};
+  if (!result.meta.weather && isSet(raw.meta?.weather)) {
+    result.meta.weather = 'Other';
+    result.meta.weatherOther = readText(raw.meta.weather,100);
   }
+  if (!result.meta.direction1) result.meta.direction1 = oppositeDirection(result.meta.direction2);
+  result.meta.direction2 = oppositeDirection(result.meta.direction1);
+  result.meta.gradeChange ||= 'na';
   result.wiresToRead = Array.isArray(raw.wiresToRead) ? [...new Set(raw.wiresToRead.filter(wire => Number.isInteger(wire) && wire >= 1 && wire <= savedWireLimit))] : [];
   for (const ref of Object.keys(poles)) {
     const saved = raw.poles?.[ref];
@@ -402,10 +440,16 @@ function normaliseJob(raw) {
     if (['pipeline','road',''].includes(item.centrelineOf)) clean.centrelineOf = item.centrelineOf;
     restoreFeature(clean,item.feature,item.edge);
     for (const field of ['grade','conductor','notes']) clean[field] = readText(item[field],300);
+    for (const field of ['pipeS1','pipeS2']) clean[field] = readText(item[field],20);
     for (let wire=1; wire<=savedWireLimit; wire++) if (isSet(item.wires?.[wire])) clean.wires[wire] = readText(item.wires[wire],40);
     result.rows.push(clean);
   }
   for (const station of result.rows) updateStationLabel(station,result.meta.crossing,result.meta.crossing);
+  const legacyPipeline = result.rows.filter(station => !station.feature && isPipelineCentreline(station,result.meta.crossing));
+  if (legacyPipeline.length === 1) for (const field of ['pipeS1','pipeS2']) {
+    legacyPipeline[0][field] ||= result.meta[field] ?? '';
+    delete result.meta[field];
+  }
   return result;
 }
 function updateStationLabel(station,previous,crossing) {
@@ -424,7 +468,7 @@ let job;
 function wires() { return Array.from({length:job.count},(_,index) => index+1); }
 function measuredWires() { return job.customRead ? wires().filter(wire => job.wiresToRead.includes(wire)) : wires(); }
 function series() {
-  if (job.mode === 'one') return [{id:'conductor',label:'Recorded conductor',color:palette[0]}];
+  if (job.mode === 'one') return [{id:'conductor',label:'Lowest conductor',color:palette[0]}];
   return measuredWires().map(wire => ({id:`wire${wire}`,label:`W${wire} conductor`,color:palette[wire-1],wire}));
 }
 function valueFor(station, line) { return line.wire ? station.wires[line.wire] : station[line.id]; }
@@ -628,24 +672,30 @@ function setFieldVisibility() {
   $('crossing-other').hidden = job.meta.crossing !== 'Other';
   $('grade-detail').hidden = job.meta.gradeChange !== 'known';
   $('grade-crossing-help').hidden = job.meta.crossing !== 'Pipeline and access road';
+  $('weather-other').hidden = job.meta.weather !== 'Other';
   const supaRule = job.meta.collectionMethod === 'Supa Rule';
   $('supa-warning').hidden = !supaRule;
   if (supaRule) $('collectionMethod').setAttribute('aria-describedby','supa-warning');
   else $('collectionMethod').removeAttribute('aria-describedby');
   $('measured-wires').hidden = job.mode !== 'all';
   $('sketch-box').hidden = !job.phase;
-  $('clear-sketch').disabled = !wires().some(wire => job.positions[wire]);
+  $('sketch-poles').hidden = !job.wireConfigDiffers;
+  $('clear-sketch').disabled = !wires().some(wire => sketchPositions()[wire]);
 }
+function sketchPositions(pole = activeSketchPole) { return pole === 'S2' && job.wireConfigDiffers ? job.positionsS2 : job.positions; }
 function drawWires() {
-  $('wire-controls').innerHTML = wires().map(wire => `<button type="button" data-wire="${wire}" aria-label="Position wire ${wire}" aria-pressed="${wire === activeWire}">W${wire}${job.positions[wire] ? ' ✓' : ''}</button>`).join('');
+  const positions = sketchPositions();
+  $('wire-controls').innerHTML = wires().map(wire => `<button type="button" data-wire="${wire}" aria-label="Position wire ${wire}" aria-pressed="${wire === activeWire}">W${wire}${positions[wire] ? ' ✓' : ''}</button>`).join('');
   const measured = measuredWires();
   $('wire-selection').innerHTML = wires().map(wire => `<button type="button" data-measure="${wire}" aria-pressed="${measured.includes(wire)}" class="${measured.includes(wire) ? 'primary' : ''}">W${wire}</button>`).join('');
   $('sketch').innerHTML = wireSupport()+wireDots(true);
+  for (const pole of ['S1','S2']) $(`sketch-${pole.toLowerCase()}`).setAttribute('aria-pressed',String(pole === activeSketchPole));
+  $('sketch').setAttribute('aria-label',`Place selected wire at ${activeSketchPole}. Use arrow keys to position a wire or Enter to place it.`);
   setFieldVisibility();
 }
-function wireDots(interactive) {
-  return wires().filter(wire => job.positions[wire]).map(wire => {
-    const {x,y} = job.positions[wire];
+function wireDots(interactive,positions = sketchPositions()) {
+  return wires().filter(wire => positions[wire]).map(wire => {
+    const {x,y} = positions[wire];
     return `<span class="wire-dot${interactive && wire === activeWire ? ' selected' : ''}" style="left:${x}%;top:${y}%">W${wire}</span>`;
   }).join('');
 }
@@ -660,8 +710,8 @@ function renderWireCount() {
   input.innerHTML = counts.map(count => `<option value="${count}">${count === standard[0] ? phases : count === standard[1] ? `${phases} + neutral` : `${count} wires · saved configuration`}</option>`).join('');
   input.value = job.count;
 }
-function wireSupport() {
-  const positions = wires().map(wire => job.positions[wire]).filter(Boolean).sort((a,b) => a.y-b.y);
+function wireSupport(wirePositions = sketchPositions()) {
+  const positions = wires().map(wire => wirePositions[wire]).filter(Boolean).sort((a,b) => a.y-b.y);
   const tiers = [];
   for (const point of positions) {
     const tier = tiers.find(group => Math.abs(group[0].y-point.y) <= 7);
@@ -691,6 +741,10 @@ function kindSelect(station,label) {
   options.push(['extra','Additional station']);
   return `<select class="station-kind" id="${station.id}-kind" data-field="kind" aria-label="${label} station type">${options.map(([kind,name]) => `<option value="${kind}"${station.kind === kind ? ' selected' : ''}>${esc(name)}</option>`).join('')}</select>`;
 }
+function pipelineDistanceFields(station,label) {
+  if (!isPipelineCentreline(station)) return '';
+  return `<details class="pole-distances" id="${station.id}-distances"><summary>Pole distances</summary><div class="distance-fields">${['S1','S2'].map(pole => `<label class="field">${pole} measured shortest horizontal (m)<input id="${station.id}-pipe${pole}" data-field="pipe${pole}" aria-label="${label} to ${pole} measured shortest horizontal distance" inputmode="decimal" maxlength="20" value="${esc(station['pipe'+pole])}" placeholder="Optional"></label>`).join('')}</div><span id="${station.id}-distance-summary"></span></details>`;
+}
 function renderRows() {
   const lines = series();
   const relative = relativeReadings();
@@ -703,7 +757,7 @@ function renderRows() {
       const input = rowInput(station,line.id,label,line.label+(relative ? ' height' : ' elevation'),true);
       return line.wire ? `<label>W${line.wire}${input}</label>` : input;
     }).join('');
-    return `<tr data-row="${station.id}"><th scope="row"><div class="station-actions"><button type="button" class="station-select" data-select="${station.id}" aria-label="Select ${label}" aria-pressed="false">${label}</button>${action}</div></th><td class="station-location">${kindSelect(station,label)}${rowInput(station,'description',label,'location')}${station.feature && station.kind === 'centreline' ? `<div class="feature-review" id="${station.id}-feature"></div>` : ''}</td><td data-caption="Chainage (m)">${rowInput(station,'chainage',label,'chainage',true)}</td><td data-caption="${grade}">${rowInput(station,'grade',label,relative ? 'grade offset' : 'grade elevation',true)}</td><td class="reading-cell" data-caption="${conductor}"><div class="station-readings">${readings}</div></td><td class="gap" data-caption="Gap (m)" id="${station.id}-gap"></td><td class="station-note" data-caption="Point IDs / note">${rowInput(station,'notes',label,'point IDs or note')}</td></tr>`;
+    return `<tr data-row="${station.id}"><th scope="row"><div class="station-actions"><button type="button" class="station-select" data-select="${station.id}" aria-label="Select ${label}" aria-pressed="false">${label}</button>${action}</div></th><td class="station-location">${kindSelect(station,label)}${rowInput(station,'description',label,'location')}${station.feature && station.kind === 'centreline' ? `<div class="feature-review" id="${station.id}-feature"></div>` : ''}${pipelineDistanceFields(station,label)}</td><td data-caption="Chainage (m)">${rowInput(station,'chainage',label,'chainage',true)}</td><td data-caption="${grade}">${rowInput(station,'grade',label,relative ? 'grade offset' : 'grade elevation',true)}</td><td class="reading-cell" data-caption="${conductor}"><div class="station-readings">${readings}</div></td><td class="gap" data-caption="Gap (m)" id="${station.id}-gap"></td><td class="station-note" data-caption="Point IDs / note">${rowInput(station,'notes',label,'point IDs or note')}</td></tr>`;
   }).join('')}</tbody>`;
   selectStation(selectedStation);
 }
@@ -829,54 +883,93 @@ function featureReviews() {
       statuses.set(station.id,{tone:'warning',text:detail,addEdges:true});
     }
   }
-  return {issues,statuses};
+  return {issues,statuses,intervals};
+}
+function isPipelineCentreline(station,crossing = job.meta.crossing) {
+  if (station.kind !== 'centreline') return false;
+  if (station.feature) return station.feature.startsWith('P');
+  if (station.centrelineOf) return station.centrelineOf === 'pipeline';
+  return ['Pipeline','Pipeline and access road'].includes(crossing);
+}
+function poleDistanceText({pole,along,measured}) {
+  const text = (value,unavailable) => value === null ? unavailable : `${value.toFixed(3)} m`;
+  return `${pole}: ${text(along,'pending')} along profile · ${text(measured,'not entered')} measured shortest horizontal`;
 }
 function pipelineCheck() {
   const crossing = job.meta.crossing;
   const combined = crossing === 'Pipeline and access road';
-  const centrelines = job.rows.filter(station => station.kind === 'centreline' && (station.feature ? station.feature.startsWith('P') : ((combined || crossing === 'Pipeline') && station.centrelineOf !== 'road')));
+  const centrelines = job.rows.filter(station => isPipelineCentreline(station,crossing));
   if (!centrelines.length && crossing !== 'Pipeline' && !combined) return null;
-  const chainages = centrelines.map(station => reportNumber(station.chainage)).filter(value => value !== null);
-  const alerts = ['S1','S2'].flatMap((pole,index) => {
-    const origin = reportNumber(job.rows.at(index === 0 ? 0 : -1).chainage);
-    const along = origin !== null && chainages.length ? Math.min(...chainages.map(chainage => Math.abs(chainage-origin))) : null;
-    if (along === null || along >= separationThreshold-1e-9) return [];
-    const distance = along.toFixed(3) === '8.000' ? 'less than 8 m' : `${along.toFixed(3)} m`;
-    return [{pole,target:'pipeline-check',text:`Pipeline CL to ${pole}: ${distance} along profile (below 8 m).`}];
-  });
-  return {combined,centrelines,alerts};
+  const alerts = [], checks = [];
+  for (const station of centrelines) {
+    const chainage = reportNumber(station.chainage);
+    const name = station.feature ? `${featureName(station.feature)} CL` : `${stationLabel(station,job.rows.indexOf(station))} Pipeline CL`;
+    const distances = ['S1','S2'].map((pole,index) => {
+      const origin = reportNumber(job.rows.at(index === 0 ? 0 : -1).chainage);
+      const along = origin !== null && chainage !== null ? Math.abs(chainage-origin) : null;
+      const input = reportNumber(station['pipe'+pole]);
+      const measured = input !== null && input >= 0 ? input : null;
+      const distance = {pole,along,measured};
+      if ([along,measured].some(value => value !== null && value < separationThreshold-1e-9)) {
+        alerts.push({pole,target:'pipeline-check',text:`${name} to ${pole} is under 8 m. ${poleDistanceText(distance)}.`});
+      }
+      return distance;
+    });
+    checks.push({station,name,distances});
+  }
+  return {combined,centrelines,alerts,checks};
 }
-function midspanWarnings(lines,start,end) {
-  if (start === null || end === null || end <= start) return [];
-  const warnings = [];
+function profileChecks(lines,start,end) {
+  const errors = [], warnings = [];
+  if (start === null || end === null || end <= start) return {errors,warnings};
+  const tolerance = 0.05;
   const first = job.rows[0], last = job.rows.at(-1);
   for (const [index,station] of job.rows.entries()) {
     const chainage = reportNumber(station.chainage);
-    if (station.kind !== 'midspan' || chainage === null || chainage <= start || chainage >= end) continue;
+    if (station.role !== 'Y' || chainage === null || chainage <= start || chainage >= end) continue;
     for (const line of lines) {
       const levels = [first,station,last].map(row => conductorLevel(row,line));
       if (levels.some(value => value === null)) continue;
-      const excess = levels[1] - Math.max(levels[0],levels[2]);
-      if (excess <= 1e-9) continue;
-      const check = relativeReadings() ? 'Check grade offsets, conductor ID and readings.' : 'Check conductor ID and readings.';
-      const text = `${stationLabel(station,index)} · Midspan is above both poles (${line.label}). ${check}`;
-      warnings.push({target:`${station.id}-${line.id}`,text});
+      const linkedWire = Boolean(line.wire) || job.count === 1;
+      const chord = levels[0]+(levels[2]-levels[0])*(chainage-start)/(end-start);
+      const excess = levels[1]-(linkedWire ? chord : Math.max(levels[0],levels[2]));
+      if (excess <= tolerance+1e-9) continue;
+      const location = station.kind === 'midspan' ? 'Midspan' : station.description || 'Reading';
+      const check = relativeReadings() ? 'Check the readings and grade offsets.' : 'Check the readings and wire ID.';
+      const text = linkedWire ? `Reading error · ${location} is ${fmt(excess)} m above the line between the pole attachments (${line.label}). ${check}` : `${location} lowest reading is ${fmt(excess)} m above both pole readings. Verify the conductor IDs and grade, or record each wire separately.`;
+      (linkedWire ? errors : warnings).push({rowId:station.id,target:`${station.id}-${line.id}`,text:`${stationLabel(station,index)} · ${text}`});
     }
   }
-  return warnings;
+  return {errors,warnings};
+}
+function clearanceWarning(station,index,lines,features,gap) {
+  const limits = clearanceLimits[job.phase];
+  if (!limits || station.role !== 'Y' || gap === null || gap <= 0) return null;
+  const x = reportNumber(station.chainage);
+  const roadCL = station.kind === 'centreline' && (station.feature.startsWith('R') || station.centrelineOf === 'road' || (!station.feature && !station.centrelineOf && job.meta.crossing === 'Access road'));
+  const pipelineBoundary = station.kind === 'boundary' && (station.feature.startsWith('P') || (!station.feature && (inferCentreline(station.description) === 'pipeline' || (job.meta.crossing === 'Pipeline' && inferCentreline(station.description) !== 'road'))));
+  const withinRW = x !== null && features.intervals.some(interval => x >= interval.near && x <= interval.far);
+  const limit = roadCL ? limits.road : (isPipelineCentreline(station) || pipelineBoundary || withinRW) ? limits.pipeline : null;
+  if (limit === null || gap >= limit-1e-9) return null;
+  const reference = roadCL ? 'road CL' : isPipelineCentreline(station) ? 'pipeline CL' : 'pipeline R/W';
+  const grade = relativeReadings() ? 0 : reportNumber(gradeText(station));
+  const lowest = lines.find(line => (reportNumber(valueFor(station,line)) ?? Infinity)-grade <= gap+1e-9);
+  return {target:`${station.id}-${lowest.id}`,text:`${stationLabel(station,index)} · Potential vertical clearance: ${fmt(gap)} m at ${reference}, below the ${fmt(limit)} m field screening threshold.`};
 }
 function stateOfForm() {
   const issues = [];
   const lines = series();
   const add = (target,text) => issues.push({target,text});
   for (const [field,label] of Object.entries(required)) if (!isSet(job.meta[field])) add(field,`${label} is missing.`);
+  if (job.meta.weather === 'Other' && !isSet(job.meta.weatherOther)) add('weatherOther','Enter the other weather conditions.');
   if (isSet(job.meta.temperature) && reportNumber(job.meta.temperature) === null) add('temperature','Ambient temperature must be a number.');
   if (job.meta.crossing === 'Other' && !isSet(job.meta.crossingOther)) add('crossingOther','Describe the other crossing type.');
   if (job.meta.gradeChange === 'known' && !isSet(job.meta.gradeDetail)) add('gradeDetail','Enter the proposed grade change details.');
   if (job.meta.gradeChange === 'pending') add('gradeChange','Proposed grade change is pending confirmation.');
   if (!job.phase) add('phase','Select single-phase or three-phase.');
   if (job.phase && !standardWireCounts().includes(job.count)) add('wireCount','Verify the wire count in this saved configuration.');
-  if (job.count > 1 && wires().some(wire => !job.positions[wire])) add('sketch','Finish the wire configuration sketch.');
+  if (job.count > 1 && wires().some(wire => !job.positions[wire])) add('sketch','Finish the S1 wire configuration sketch.');
+  if (job.wireConfigDiffers && wires().some(wire => !job.positionsS2[wire])) add('sketch-s2','Finish the separate S2 wire configuration sketch.');
   if (job.mode === 'all' && !lines.length) add('mode','Select the wires to measure.');
   const missingKinds = missingStationKinds();
   if (missingKinds.includes('boundary')) add('add-required','Record both boundary or shoulder stations.');
@@ -891,6 +984,7 @@ function stateOfForm() {
   const length = start !== null && end !== null && end > start ? end-start : null;
   if (start !== null && end !== null && length === null) add(`${job.rows.at(-1).id}-chainage`,'S2 chainage must be greater than S1 chainage.');
   const gaps = [];
+  const clearanceWarnings = [];
   const minimumComplete = new Set();
   job.rows.forEach((station,index) => {
     const label = stationLabel(station,index);
@@ -907,6 +1001,12 @@ function stateOfForm() {
     if (station.kind === 'midspan' && length !== null && (x === start || x === end)) add(`${station.id}-chainage`,`${label} · midspan must be between the poles.`);
     const gap = stationGap(station,lines);
     if (gap !== null) gaps.push(gap);
+    if (isPipelineCentreline(station)) for (const pole of ['S1','S2']) {
+      const field = 'pipe'+pole, value = reportNumber(station[field]);
+      if (isSet(station[field]) && (value === null || value < 0)) add(`${station.id}-${field}`,`${label} · ${pole} measured shortest horizontal distance must be zero or greater.`);
+    }
+    const clearance = clearanceWarning(station,index,lines,features,gap);
+    if (clearance) clearanceWarnings.push(clearance);
     if (gap !== null && gap <= 0) {
       const field = relativeReadings() ? lines.find(line => (reportNumber(valueFor(station,line)) ?? Infinity) <= 0).id : 'grade';
       add(`${station.id}-${field}`,`${label} · verify the conductor reading at or below grade.`);
@@ -915,7 +1015,10 @@ function stateOfForm() {
       minimumComplete.add(station.id);
     }
   });
-  return {issues,minimumComplete,missingKinds,proximity,features,warnings:midspanWarnings(lines,start,end),lines,length,min:gaps.length ? Math.min(...gaps) : null};
+  const profile = profileChecks(lines,start,end);
+  issues.push(...profile.errors);
+  for (const error of profile.errors) minimumComplete.delete(error.rowId);
+  return {issues,minimumComplete,missingKinds,proximity,features,profileErrors:profile.errors,warnings:[...profile.warnings,...clearanceWarnings],lines,length,min:gaps.length ? Math.min(...gaps) : null};
 }
 function sketchStation(point) {
   const {station,label} = point;
@@ -1034,10 +1137,11 @@ function refresh() {
   $('basis-help').textContent = relative ? 'Enter conductor heights above local ground. Grade defaults to 0.00 m. If ground levels differ, enter each grade offset from S1 ground level.' : 'Enter grade and conductor elevations on the same datum.';
   $('profile-help').textContent = relative ? 'The sketch joins recorded readings and uses grade offsets to plot conductor heights on a common reference.' : 'The sketch joins recorded readings. Pole tops mark the highest measured conductor attachment.';
   const warnings = state.warnings.map(item => `<li><button type="button" data-target="${item.target}">${esc(item.text)}</button></li>`).join('');
-  if ($('profile-warnings').innerHTML !== warnings) $('profile-warnings').innerHTML = warnings;
-  $('profile-warnings').hidden = !state.warnings.length;
-  $('midspan-review').hidden = !state.warnings.length;
-  $('midspan-review').firstElementChild.textContent = state.warnings.length === 1 ? 'Review midspan warning' : `Review ${state.warnings.length} midspan warnings`;
+  const errors = state.profileErrors.map(item => `<li><button type="button" class="pipeline-alert" data-target="${item.target}">${esc(item.text)}</button></li>`).join('');
+  if ($('profile-warnings').innerHTML !== errors+warnings) $('profile-warnings').innerHTML = errors+warnings;
+  $('profile-warnings').hidden = !state.warnings.length && !state.profileErrors.length;
+  $('midspan-review').hidden = $('profile-warnings').hidden;
+  $('midspan-review').firstElementChild.textContent = 'Review profile and clearance flags';
   const status = $('review-status');
   const count = state.issues.length;
   const warning = state.proximity?.alerts.length;
@@ -1057,11 +1161,15 @@ function refresh() {
   }).join('');
   $('add-required').hidden = state.missingKinds.length === 0;
   const proximity = state.proximity;
+  for (const {station,distances} of proximity?.checks ?? []) {
+    const summary = $(`${station.id}-distance-summary`);
+    if (summary) summary.textContent = distances.map(poleDistanceText).join(' / ');
+  }
   $('pipeline-check').hidden = !warning;
   const readings = (proximity?.alerts ?? []).map(item => `<li class="pipeline-alert">${esc(item.text)}</li>`).join('');
   if ($('pipe-readings').innerHTML !== readings) $('pipe-readings').innerHTML = readings;
   $('pipe-review').hidden = !warning;
-  if (warning) $('pipe-review').firstElementChild.textContent = `Pipeline CL closer than 8 m to ${proximity.alerts.map(item => item.pole).join(' and ')}`;
+  if (warning) $('pipe-review').firstElementChild.textContent = `Pipeline CL closer than 8 m to ${[...new Set(proximity.alerts.map(item => item.pole))].join(' and ')}`;
   $('issues').innerHTML = state.issues.map(issue => `<li><button type="button" data-target="${issue.target}">${esc(issue.text)}</button></li>`).join('');
   const flagged = new Set(state.issues.map(issue => issue.target));
   document.querySelectorAll('[data-meta],[data-field],#phase,#wireCount,#mode').forEach(input => {
@@ -1071,6 +1179,8 @@ function refresh() {
 }
 function renderJob() {
   for (const field of metaKeys) $(field).value = job.meta[field] ?? '';
+  $('s2-differs').checked = job.wireConfigDiffers;
+  if (!job.wireConfigDiffers) activeSketchPole = 'S1';
   $('measurement-basis').value = job.measurementBasis;
   $('phase').value = job.phase;
   renderWireCount();
@@ -1088,6 +1198,12 @@ function renderJob() {
 function goTo(id) {
   const field = $(id);
   if (field) {
+    if (id === 'sketch' || id === 'sketch-s2') {
+      activeSketchPole = id === 'sketch-s2' ? 'S2' : 'S1';
+      drawWires();
+    }
+    const details = field.closest('details');
+    if (details) details.open = true;
     field.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
     field.focus({preventScroll:true});
   }
@@ -1124,17 +1240,18 @@ function addFeatureEdges(station) {
 }
 function changeSketch(kind) {
   const [phases,withNeutral] = standardWireCounts();
+  const positions = sketchPositions();
   for (const wire of wires()) {
     const phaseCount = job.count === withNeutral ? phases : job.count;
     const fraction = (wire-1)/Math.max(1,phaseCount-1);
-    if (kind === 'clear') delete job.positions[wire];
-    else if (job.count === withNeutral && wire === withNeutral) job.positions[wire] = {x:50,y:85};
-    else if (phaseCount === 1) job.positions[wire] = {x:50,y:30};
-    else if (kind === 'horizontal') job.positions[wire] = {x:14+72*fraction,y:39};
-    else if (kind === 'vertical') job.positions[wire] = {x:50,y:16+(job.count === withNeutral ? 50 : 68)*fraction};
+    if (kind === 'clear') delete positions[wire];
+    else if (job.count === withNeutral && wire === withNeutral) positions[wire] = {x:50,y:85};
+    else if (phaseCount === 1) positions[wire] = {x:50,y:30};
+    else if (kind === 'horizontal') positions[wire] = {x:14+72*fraction,y:39};
+    else if (kind === 'vertical') positions[wire] = {x:50,y:16+(job.count === withNeutral ? 50 : 68)*fraction};
     else {
       const lowCount = phaseCount-1;
-      job.positions[wire] = wire === 1 ? {x:50,y:26} : {x:lowCount === 1 ? 50 : 14+72*(wire-2)/(lowCount-1),y:72};
+      positions[wire] = wire === 1 ? {x:50,y:26} : {x:lowCount === 1 ? 50 : 14+72*(wire-2)/(lowCount-1),y:72};
     }
   }
   drawWires();refresh();queueSave();
@@ -1176,8 +1293,8 @@ function csvRows(csv) {
 }
 function exportCSV() {
   const lines = series();
-  const keys = ['station','location','chainage_m','grade_m',...lines.map(line => line.wire ? `w${line.wire}_m` : 'conductor_m'),'gap_m','point_ids_or_note','station_type','centreline_feature','measurement_basis','grade_assumed','crossing_id','boundary_side'];
-  const records = job.rows.map((station,index) => [stationLabel(station,index),station.description,station.chainage,gradeText(station),...lines.map(line => valueFor(station,line)),stationGap(station,lines)?.toFixed(2) ?? '',station.notes,station.kind,station.kind === 'centreline' ? station.centrelineOf : '',job.measurementBasis,gradeAssumed(station) ? 'yes' : '',station.feature,station.edge]);
+  const keys = ['station','location','chainage_m','grade_m',...lines.map(line => line.wire ? `w${line.wire}_m` : 'conductor_m'),'gap_m','point_ids_or_note','station_type','centreline_feature','measurement_basis','grade_assumed','crossing_id','boundary_side','s1_shortest_horizontal_m','s2_shortest_horizontal_m'];
+  const records = job.rows.map((station,index) => [stationLabel(station,index),station.description,station.chainage,gradeText(station),...lines.map(line => valueFor(station,line)),stationGap(station,lines)?.toFixed(2) ?? '',station.notes,station.kind,station.kind === 'centreline' ? station.centrelineOf : '',job.measurementBasis,gradeAssumed(station) ? 'yes' : '',station.feature,station.edge,station.pipeS1,station.pipeS2]);
   download('\uFEFF'+[keys,...records].map(fields => fields.map(csvCell).join(',')).join('\r\n'),'text/csv;charset=utf-8',filename('csv'));
 }
 function importCSV(text) {
@@ -1210,6 +1327,8 @@ function importCSV(text) {
     const grade = cell('grade_m').slice(0,20);
     station.grade = basis === 'relative' && cell('grade_assumed').trim().toLowerCase() === 'yes' && reportNumber(grade) === 0 ? '' : grade;
     station.notes = cell('point_ids_or_note').slice(0,240);
+    station.pipeS1 = cell('s1_shortest_horizontal_m').slice(0,20);
+    station.pipeS2 = cell('s2_shortest_horizontal_m').slice(0,20);
     for (const line of lines) {
       if (line.wire) station.wires[line.wire] = cell(`w${line.wire}_m`).slice(0,20);
       else station.conductor = cell('conductor_m').slice(0,20);
@@ -1253,6 +1372,23 @@ function printObservationTables(lines) {
     return `${groupLabel}<table><thead><tr><th scope="col">Station</th><th scope="col">Location</th><th scope="col" class="num">Chainage (m)</th><th scope="col" class="num">${relative ? 'Grade offset' : 'Grade'} (m)</th>${columns}${extras}</tr></thead><tbody>${rows}</tbody></table>`;
   }).join('');
 }
+function printWireSketches() {
+  const polesToDraw = job.wireConfigDiffers ? ['S1','S2'] : job.count > 1 ? ['S1'] : [];
+  if (!polesToDraw.length) return '';
+  const drawings = polesToDraw.map(pole => {
+    const positions = sketchPositions(pole);
+    return `<div class="print-pole-sketch"><strong>${job.wireConfigDiffers ? pole : 'S1 and S2'}</strong><div class="sketch">${wireSupport(positions)}${wireDots(false,positions)}</div></div>`;
+  });
+  return `<div><strong>Wire configuration</strong>${drawings.join('')}</div>`;
+}
+function printPipelineCheck(proximity) {
+  const alerts = proximity?.alerts ?? [];
+  const measurements = (proximity?.checks ?? []).flatMap(check => check.distances.filter(distance => distance.measured !== null).map(distance => `${check.name} · ${poleDistanceText(distance)}`));
+  if (!alerts.length && !measurements.length) return '';
+  const display = alerts.length ? `<h2>Pipeline warning</h2><ul class="pipeline-distances">${alerts.map(item => `<li class="pipeline-alert">${esc(item.text)}</li>`).join('')}</ul>` : '';
+  const recorded = measurements.length ? `<h2>Recorded pipeline-to-pole measurements</h2><ul class="pipeline-distances">${measurements.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : '';
+  return `<section class="pipeline-report">${display}${recorded}<p><a href="https://ebs.safetycodes.ab.ca/documents/webdocs/PI/2022_AEUC.pdf#page=14">Alberta Electrical Utility Code, Rule 2-030</a></p></section>`;
+}
 function printReport() {
   const state = stateOfForm();
   const meta = job.meta;
@@ -1261,16 +1397,17 @@ function printReport() {
   const crossing = [primaryCrossing,...additions].filter(Boolean).join(' · ');
   const grade = {na:'None',known:meta.gradeDetail,pending:'Pending confirmation'}[meta.gradeChange];
   const phase = {single:'Single-phase',three:'Three-phase'}[job.phase] ?? 'Pending';
-  const fields = [['Location',meta.location],['Job Number',meta.fileNumber],['Client',meta.client],['Completed by',meta.completedBy],['Readings',measurementLabels[job.measurementBasis]],['Land agent / Client Rep',meta.landAgent],['Land agent / Client file number',meta.agentFile],['Crossing type',crossing],['Proposed grade change at crossing CL',grade],['Survey date',meta.date],['Survey time',meta.time],['Ambient temperature',isSet(meta.temperature) ? `${meta.temperature} °C` : ''],['Weather',meta.weather],['S1 end direction',meta.direction1],['S2 end direction',meta.direction2],['Phase / number of wires',`${phase} / ${job.count}`],['Conductor readings',job.mode === 'all' ? `Separate readings${measuredWires().length ? ` (${measuredWires().map(wire => 'W'+wire).join(', ')})` : ''}` : 'One recorded conductor per station']];
+  const fields = [['Location',meta.location],['Job Number',meta.fileNumber],['Client',meta.client],['Completed by',meta.completedBy],['Readings',measurementLabels[job.measurementBasis]],['Land agent / Client Rep',meta.landAgent],['Land agent / Client file number',meta.agentFile],['Crossing type',crossing],['Proposed grade change at crossing CL',grade],['Survey date',meta.date],['Survey time',meta.time],['Ambient temperature',isSet(meta.temperature) ? `${meta.temperature} °C` : ''],['Weather',meta.weather === 'Other' ? meta.weatherOther : meta.weather],['S1 end direction',meta.direction1],['S2 end direction',meta.direction2],['Phase / number of wires',`${phase} / ${job.count}`],['Conductor readings',job.mode === 'all' ? `Separate readings${measuredWires().length ? ` (${measuredWires().map(wire => 'W'+wire).join(', ')})` : ''}` : 'Lowest conductor']];
   const report = $('print-report');
   const review = reviewItems(state);
   const needsReview = review.warnings.length;
   const gradeNote = job.rows.some(gradeAssumed) ? '* Grade offset assumed 0.00 m. ' : '';
+  const wireSketches = printWireSketches();
   report.innerHTML = `<div class="print-head"><div>${logoMarkup()}<h1>Powerline Crossing Profile</h1></div><div class="status ${review.incomplete.length || needsReview ? 'pending' : 'ready'}">${review.incomplete.length ? 'Incomplete field draft' : needsReview ? 'Field data complete · Review warnings' : 'Field data complete · ALS review'}</div></div>
     <div class="field-grid">${fields.map(([name,value]) => `<div><span>${esc(name)}</span>${esc(value || '—')}</div>`).join('')}</div>
-    <div class="plot"><div class="metrics">${metrics(state)}</div><div class="print-profile${job.count === 1 ? ' solo' : ''}"><div><div class="profile-chart">${chart(state.lines)}</div><div class="legend">${legend(state.lines)}</div></div>${job.count>1 ? `<div><strong>Wire configuration</strong><div class="sketch">${wireSupport()}${wireDots(false)}</div></div>` : ''}</div></div>
+    <div class="plot"><div class="metrics">${metrics(state)}</div><div class="print-profile${wireSketches ? '' : ' solo'}"><div><div class="profile-chart">${chart(state.lines)}</div><div class="legend">${legend(state.lines)}</div></div>${wireSketches}</div></div>
     <div class="header-line"><h2>Station observations</h2><div class="method-report">Collection method · ${esc(meta.collectionMethod || 'Pending')}</div></div>${printObservationTables(state.lines)}
-    ${state.proximity?.alerts.length ? `<section class="pipeline-report"><h2>Pipeline proximity warning</h2><ul class="pipeline-distances">${state.proximity.alerts.map(item => `<li class="pipeline-alert">${esc(item.text)}</li>`).join('')}</ul></section>` : ''}
+    ${printPipelineCheck(state.proximity)}
     ${meta.wireNotes ? `<h2>Configuration notes</h2><div class="lines">${esc(meta.wireNotes)}</div>` : ''}${meta.notes ? `<h2>Survey notes</h2><div class="lines">${esc(meta.notes)}</div>` : ''}
     ${state.warnings.length ? `<h2>Profile warnings</h2><ul class="pipeline-distances pipeline-alert">${state.warnings.map(item => `<li>${esc(item.text)}</li>`).join('')}</ul>` : ''}
     ${review.incomplete.length ? `<h2>Items to follow up</h2><ul class="print-check">${review.incomplete.map(issue => `<li>${esc(issue.text)}</li>`).join('')}</ul>` : ''}<p class="small muted">${gradeNote}Survey draft for ALS review.</p>${printPhotos()}`;
@@ -1322,6 +1459,10 @@ for (const field of metaKeys) $(field).addEventListener('input', event => {
     for (const station of job.rows) updateStationLabel(station,previous,job.meta.crossing);
     renderRows();
   }
+  if (field === 'direction1') {
+    job.meta.direction2 = oppositeDirection(job.meta.direction1);
+    $('direction2').value = job.meta.direction2;
+  }
   setFieldVisibility();refresh();queueSave();
 });
 $('phase').addEventListener('change', event => {
@@ -1337,6 +1478,18 @@ $('mode').addEventListener('change', event => {
   job.mode = event.target.value;
   renderJob();
 });
+$('s2-differs').addEventListener('change',event => {
+  job.wireConfigDiffers = event.target.checked;
+  if (job.wireConfigDiffers && !Object.keys(job.positionsS2).length) job.positionsS2 = validSketch(job.positions);
+  activeSketchPole = job.wireConfigDiffers ? 'S2' : 'S1';
+  drawWires();refresh();queueSave();
+});
+$('sketch-poles').addEventListener('click',event => {
+  const button = event.target.closest('[data-sketch-pole]');
+  if (!button) return;
+  activeSketchPole = button.dataset.sketchPole;
+  drawWires();
+});
 $('wire-controls').addEventListener('click', event => {
   const button = event.target.closest('[data-wire]');if (!button) return;
   activeWire = Number(button.dataset.wire);drawWires();$('sketch').focus();
@@ -1350,7 +1503,7 @@ $('wire-selection').addEventListener('click', event => {
   drawWires();renderRows();refresh();queueSave();$('wire-selection').querySelector(`[data-measure="${wire}"]`).focus();
 });
 function placeWire(x,y) {
-  job.positions[activeWire] = {x:Math.max(8,Math.min(92,x)),y:Math.max(14,Math.min(86,y))};
+  sketchPositions()[activeWire] = {x:Math.max(8,Math.min(92,x)),y:Math.max(14,Math.min(86,y))};
   drawWires();refresh();queueSave();
 }
 $('sketch').addEventListener('click', event => {
@@ -1358,7 +1511,7 @@ $('sketch').addEventListener('click', event => {
   placeWire((event.clientX-bounds.left)/bounds.width*100,(event.clientY-bounds.top)/bounds.height*100);
 });
 $('sketch').addEventListener('keydown', event => {
-  const point = job.positions[activeWire] ?? {x:50,y:50};
+  const point = sketchPositions()[activeWire] ?? {x:50,y:50};
   const moves = {ArrowLeft:[-4,0],ArrowRight:[4,0],ArrowUp:[0,-4],ArrowDown:[0,4],Enter:[0,0],' ':[0,0]};
   if (moves[event.key]) {event.preventDefault();const [x,y]=moves[event.key];placeWire(point.x+x,point.y+y);}
 });
